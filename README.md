@@ -1,5 +1,3 @@
-Here is the best README I could create for your GitHub project:
-
 Aurora Nuker
 A powerful Discord nuking tool designed to wreak havoc on Discord servers. Exercise caution and use responsibly.
 
