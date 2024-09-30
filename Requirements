@@ -1,0 +1,16 @@
+discord.py>=2.0.1
+colorama>=0.4.6
+
+Explanation
+
+discord.py>=2.0.1: This line ensures the installation of the Discord.py library, crucial for interacting with the Discord API. The >=2.0.1 part specifies that version 2.0.1 or any newer version is acceptable.
+colorama>=0.4.6: This line handles the installation of the colorama library, which is used for adding color to the console output (e.g., the banner and messages). Again, >=0.4.6 allows for compatibility with newer versions.
+How to use it
+
+Save the content: Create a file named requirements.txt in the same directory as your Python script (Aurora.Py). Paste the code above into this file.
+
+Install dependencies: Open your terminal, navigate to the directory where you saved requirements.txt, and run:
+
+pip install -r requirements.txt 
+
+Or you may open a Command prompt as administrator and type these commands "pip install Discord" "pip install Colorama"
