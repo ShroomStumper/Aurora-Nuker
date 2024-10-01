@@ -1,0 +1,4 @@
+Version:
+
+
+// This is for the auto update functonality that I plan on adding pretty soon.
