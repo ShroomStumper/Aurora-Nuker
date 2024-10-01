@@ -41,3 +41,5 @@ Please use this tool responsibly and ensure you have the necessary permissions b
 
 
 UPDATES SHOULD BE EVERY 1-2 DAYS, SOMETIMES IT MAY BE LONGER BUT I CAN PROMISE THIS TOOL WILL GET UPDATED WEEKLY UNTIL IM FINISHED WITH IT!
+
+If you want to contact me my discord user is 5td1.
