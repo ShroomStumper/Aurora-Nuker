@@ -38,3 +38,6 @@ ShroomStumper - Creator of Aurora Nuker
 If you have any questions or suggestions, feel free to open an issue or pull request.
 
 Please use this tool responsibly and ensure you have the necessary permissions before running it on any Discord server. ;)
+
+
+UPDATES SHOULD BE EVERY 1-2 DAYS, SOMETIMES IT MAY BE LONGER BUT I CAN PROMISE THIS TOOL WILL GET UPDATED WEEKLY UNTIL IM FINISHED WITH IT!
